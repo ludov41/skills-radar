@@ -1,8 +1,21 @@
 ---
 import Base from '../layouts/Base.astro';
+import { getSkills } from '../lib/github';
+
+const skills = await getSkills();
 ---
 
 <Base title="Skills Radar">
   <h1>Skills Radar</h1>
   <p>The most popular agent skills on GitHub.</p>
+
+  <ol>
+    {
+      skills.map((skill) => (
+        <li>
+          <a href={skill.url}>{skill.fullName}</a> ({skill.stars} stars)
+        </li>
+      ))
+    }
+  </ol>
 </Base>
