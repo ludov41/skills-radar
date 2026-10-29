@@ -3,19 +3,87 @@ import Base from '../layouts/Base.astro';
 import { getSkills } from '../lib/github';
 
 const skills = await getSkills();
+
+const compact = new Intl.NumberFormat('en', { notation: 'compact' });
+const date = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
 ---
 
 <Base title="Skills Radar">
-  <h1>Skills Radar</h1>
-  <p>The most popular agent skills on GitHub.</p>
+  <header>
+    <h1>Skills Radar</h1>
+    <p>
+      The {skills.length} most starred agent skill repositories on GitHub. Updated
+      {date.format(new Date())}.
+    </p>
+  </header>
 
-  <ol>
+  <ol id="list">
     {
-      skills.map((skill) => (
-        <li>
-          <a href={skill.url}>{skill.fullName}</a> ({skill.stars} stars)
+      skills.map((skill, i) => (
+        <li value={i + 1}>
+          <div class="row">
+            <a href={skill.url}>
+              <span class="owner">{skill.owner}/</span>
+              {skill.name}
+            </a>
+            <span class="stars" title={`${skill.stars.toLocaleString('en')} stars`}>
+              ★ {compact.format(skill.stars)}
+            </span>
+          </div>
+          {skill.description && <p>{skill.description}</p>}
+          <small>Updated {date.format(new Date(skill.pushedAt))}</small>
         </li>
       ))
     }
   </ol>
 </Base>
+
+<style>
+  header {
+    padding-block: 2rem 1rem;
+  }
+
+  h1 {
+    margin: 0;
+  }
+
+  header p,
+  small,
+  .owner {
+    color: var(--muted);
+  }
+
+  ol {
+    padding-left: 2rem;
+  }
+
+  li {
+    padding-block: 0.9rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  li::marker {
+    color: var(--muted);
+  }
+
+  .row {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .row a {
+    font-weight: 600;
+    text-decoration: none;
+    overflow-wrap: anywhere;
+  }
+
+  .stars {
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  li p {
+    margin: 0.25rem 0;
+  }
+</style>
