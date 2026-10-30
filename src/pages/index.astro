@@ -15,12 +15,13 @@ const date = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
       The {skills.length} most starred agent skill repositories on GitHub. Updated
       {date.format(new Date())}.
     </p>
+    <input id="filter" type="search" placeholder="Filter by name, owner or topic" aria-label="Filter skills" />
   </header>
 
   <ol id="list">
     {
       skills.map((skill, i) => (
-        <li value={i + 1}>
+        <li value={i + 1} data-search={`${skill.fullName} ${skill.description} ${skill.topics.join(' ')}`.toLowerCase()}>
           <div class="row">
             <a href={skill.url}>
               <span class="owner">{skill.owner}/</span>
@@ -36,7 +37,25 @@ const date = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
       ))
     }
   </ol>
+  <p id="empty" hidden>No skills match your filter.</p>
 </Base>
+
+<script>
+  const input = document.querySelector<HTMLInputElement>('#filter')!;
+  const items = document.querySelectorAll<HTMLLIElement>('#list li');
+  const empty = document.querySelector<HTMLElement>('#empty')!;
+
+  input.addEventListener('input', () => {
+    const query = input.value.trim().toLowerCase();
+    let shown = 0;
+    for (const item of items) {
+      const match = item.dataset.search!.includes(query);
+      item.hidden = !match;
+      if (match) shown++;
+    }
+    empty.hidden = shown > 0;
+  });
+</script>
 
 <style>
   header {
@@ -51,6 +70,16 @@ const date = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
   small,
   .owner {
     color: var(--muted);
+  }
+
+  input {
+    width: 100%;
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    background: transparent;
+    color: inherit;
+    font: inherit;
   }
 
   ol {
