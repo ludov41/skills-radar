@@ -32,12 +32,15 @@ async function searchTopic(topic: string): Promise<Repo[]> {
     per_page: '100',
   });
 
-  const res = await fetch(`https://api.github.com/search/repositories?${params}`, {
-    headers: {
-      Accept: 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-    },
-  });
+  const headers: Record<string, string> = {
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+  // Optional, but raises the search rate limit (used in CI).
+  const token = import.meta.env.GITHUB_TOKEN;
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(`https://api.github.com/search/repositories?${params}`, { headers });
   if (!res.ok) {
     throw new Error(`GitHub search failed for "${topic}": ${res.status} ${await res.text()}`);
   }
