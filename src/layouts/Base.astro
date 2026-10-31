@@ -22,16 +22,31 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     <main>
       <slot />
     </main>
+    <footer>
+      Data from the GitHub search API ·
+      <a href="https://github.com/ludov41/skills-radar">Source</a>
+    </footer>
   </body>
 </html>
 
 <style is:global>
   :root {
+    color-scheme: light dark;
     --bg: #fafaf9;
     --fg: #1c1917;
     --muted: #78716c;
     --border: #e7e5e4;
     --accent: #0f766e;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161514;
+      --fg: #e7e5e4;
+      --muted: #a8a29e;
+      --border: #292524;
+      --accent: #5eead4;
+    }
   }
 
   * {
@@ -45,10 +60,17 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     font: 16px/1.5 system-ui, sans-serif;
   }
 
-  main {
+  main,
+  footer {
     max-width: 48rem;
     margin: 0 auto;
     padding: 0 1rem;
+  }
+
+  footer {
+    padding-block: 2rem;
+    color: var(--muted);
+    font-size: 0.875rem;
   }
 
   a {
