@@ -3,6 +3,9 @@ name: Deploy
 on:
   push:
     branches: [main]
+  # Rebuild every night to refresh the star counts.
+  schedule:
+    - cron: '0 4 * * *'
   workflow_dispatch:
 
 permissions:
