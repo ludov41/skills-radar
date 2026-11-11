@@ -17,17 +17,24 @@ interface Repo {
   description: string | null;
   stargazers_count: number;
   pushed_at: string;
+  default_branch: string;
   topics?: string[];
 }
 
 export interface SkillsResult {
   skills: Skill[];
-  // Topics that could not be fetched (rate limit, network error...)
-  failedTopics: string[];
+  // Searches that could not be fetched (rate limit, network error...)
+  failedSearches: string[];
 }
 
-// GitHub topics commonly used for agent skill repositories.
-const TOPICS = ['agent-skills', 'claude-skills', 'claude-code-skills', 'claude-skill'];
+// GitHub topics commonly used for agent skill repositories: results are trusted as is.
+const TOPIC_SEARCHES = ['agent-skills', 'claude-skills', 'claude-code-skills', 'claude-skill'].map((t) => `topic:${t}`);
+// Many skill repos have no topics, so also search by name. Results need to be checked.
+// `skills` is GitHub's own learning-courses org.
+const NAME_SEARCH = 'skills in:name -user:skills';
+// Terms that mark a repo found by name as being about agent skills.
+const KEYWORDS = /\b(agents?|agentic|ai|llms?|claude|codex|cursor|copilot|gemini|mcp|skill\.md)\b/i;
+
 const LIMIT = 100;
 // The search rate limit resets every minute: wait for it, but not longer.
 const MAX_RETRY_WAIT_MS = 65_000;
@@ -46,63 +53,97 @@ function rateLimitWait(res: Response): number | null {
   return null;
 }
 
-async function searchTopic(topic: string): Promise<Repo[]> {
-  const params = new URLSearchParams({
-    q: `topic:${topic} fork:false archived:false`,
-    sort: 'stars',
-    order: 'desc',
-    per_page: '100',
-  });
-
+async function githubFetch<T>(path: string): Promise<T> {
   const headers: Record<string, string> = {
     Accept: 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
   };
-  // Optional, but raises the search rate limit.
+  // Optional, but raises the rate limits.
   const token = import.meta.env.GITHUB_TOKEN;
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const url = `https://api.github.com/search/repositories?${params}`;
   for (let attempt = 1; ; attempt++) {
-    const res = await fetch(url, { headers });
-    if (res.ok) return ((await res.json()) as { items: Repo[] }).items;
+    const res = await fetch(`https://api.github.com${path}`, { headers });
+    if (res.ok) return (await res.json()) as T;
 
     const wait = rateLimitWait(res);
     if (attempt === 1 && wait !== null && wait <= MAX_RETRY_WAIT_MS) {
-      console.warn(`[skills-radar] Rate limited on "${topic}", retrying in ${Math.ceil(wait / 1000)}s`);
+      console.warn(`[skills-radar] Rate limited on ${path}, retrying in ${Math.ceil(wait / 1000)}s`);
       await sleep(wait);
       continue;
     }
-    throw new Error(`GitHub search failed for "${topic}": ${res.status} ${await res.text()}`);
+    throw new Error(`GitHub request failed for ${path}: ${res.status} ${await res.text()}`);
   }
 }
 
+async function search(query: string): Promise<Repo[]> {
+  const params = new URLSearchParams({
+    q: `${query} fork:false archived:false`,
+    sort: 'stars',
+    order: 'desc',
+    per_page: '100',
+  });
+  const data = await githubFetch<{ items: Repo[] }>(`/search/repositories?${params}`);
+  return data.items;
+}
+
+// A repo with at least one SKILL.md file contains agent skills.
+async function hasSkillFile(repo: Repo): Promise<boolean> {
+  try {
+    const branch = encodeURIComponent(repo.default_branch);
+    const tree = await githubFetch<{ tree: { path: string }[] }>(
+      `/repos/${repo.full_name}/git/trees/${branch}?recursive=1`,
+    );
+    return tree.tree.some(({ path }) => /(^|\/)skill\.md$/i.test(path));
+  } catch (error) {
+    // When in doubt, leave it out.
+    console.warn(`[skills-radar] ${error instanceof Error ? error.message : error}`);
+    return false;
+  }
+}
+
+function looksLikeSkills(repo: Repo): boolean {
+  return KEYWORDS.test(`${repo.description ?? ''} ${(repo.topics ?? []).join(' ')}`);
+}
+
 export async function getSkills(): Promise<SkillsResult> {
+  const candidates = new Map<string, Repo>();
+  const trusted = new Set<string>();
+  const failedSearches: string[] = [];
+
   // Sequential on purpose: parallel search requests trip GitHub's secondary rate limit.
-  const byName = new Map<string, Repo>();
-  const failedTopics: string[] = [];
-  for (const topic of TOPICS) {
+  for (const query of [...TOPIC_SEARCHES, NAME_SEARCH]) {
     try {
-      for (const repo of await searchTopic(topic)) byName.set(repo.full_name, repo);
+      for (const repo of await search(query)) {
+        candidates.set(repo.full_name, repo);
+        if (query !== NAME_SEARCH) trusted.add(repo.full_name);
+      }
     } catch (error) {
-      failedTopics.push(topic);
+      failedSearches.push(query);
       console.warn(`[skills-radar] ${error instanceof Error ? error.message : error}`);
     }
   }
 
-  const skills = [...byName.values()]
-    .sort((a, b) => b.stargazers_count - a.stargazers_count)
-    .slice(0, LIMIT)
-    .map((repo) => ({
-      fullName: repo.full_name,
-      owner: repo.owner.login,
-      name: repo.name,
-      url: repo.html_url,
-      description: repo.description ?? '',
-      stars: repo.stargazers_count,
-      pushedAt: repo.pushed_at,
-      topics: repo.topics ?? [],
-    }));
+  // Walk by stars and only check the ambiguous repos that would make the list.
+  const selected: Repo[] = [];
+  const sorted = [...candidates.values()].sort((a, b) => b.stargazers_count - a.stargazers_count);
+  for (const repo of sorted) {
+    if (selected.length === LIMIT) break;
+    if (trusted.has(repo.full_name) || looksLikeSkills(repo) || (await hasSkillFile(repo))) {
+      selected.push(repo);
+    }
+  }
 
-  return { skills, failedTopics };
+  const skills = selected.map((repo) => ({
+    fullName: repo.full_name,
+    owner: repo.owner.login,
+    name: repo.name,
+    url: repo.html_url,
+    description: repo.description ?? '',
+    stars: repo.stargazers_count,
+    pushedAt: repo.pushed_at,
+    topics: repo.topics ?? [],
+  }));
+
+  return { skills, failedSearches };
 }

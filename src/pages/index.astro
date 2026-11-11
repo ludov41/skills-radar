@@ -2,7 +2,7 @@
 import Base from '../layouts/Base.astro';
 import { getSkills } from '../lib/github';
 
-const { skills, failedTopics } = await getSkills();
+const { skills, failedSearches } = await getSkills();
 
 const compact = new Intl.NumberFormat('en', { notation: 'compact' });
 const date = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
@@ -16,10 +16,10 @@ const date = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
       Updated {date.format(new Date())}.
     </p>
     {
-      failedTopics.length > 0 && (
+      failedSearches.length > 0 && (
         <p class="notice">
-          Some results are missing: GitHub could not be reached for {failedTopics.join(', ')} (rate limit or network
-          error). Try again in a minute, or set <code>GITHUB_TOKEN</code>.
+          Some results are missing: {failedSearches.length} GitHub search(es) failed (rate limit or network error). Try
+          again in a minute, or set <code>GITHUB_TOKEN</code>.
         </p>
       )
     }
