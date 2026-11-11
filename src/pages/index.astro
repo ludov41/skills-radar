@@ -2,7 +2,7 @@
 import Base from '../layouts/Base.astro';
 import { getSkills } from '../lib/github';
 
-const skills = await getSkills();
+const { skills, failedTopics } = await getSkills();
 
 const compact = new Intl.NumberFormat('en', { notation: 'compact' });
 const date = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
@@ -12,9 +12,17 @@ const date = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
   <header>
     <h1>Skills Radar</h1>
     <p>
-      The {skills.length} most starred agent skill repositories on GitHub. Updated
-      {date.format(new Date())}.
+      {skills.length > 0 ? `The ${skills.length} most starred` : 'The most starred'} agent skill repositories on GitHub.
+      Updated {date.format(new Date())}.
     </p>
+    {
+      failedTopics.length > 0 && (
+        <p class="notice">
+          Some results are missing: GitHub could not be reached for {failedTopics.join(', ')} (rate limit or network
+          error). Try again in a minute, or set <code>GITHUB_TOKEN</code>.
+        </p>
+      )
+    }
     <input id="filter" type="search" placeholder="Filter by name, owner or topic" aria-label="Filter skills" />
   </header>
 
@@ -70,6 +78,13 @@ const date = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
   small,
   .owner {
     color: var(--muted);
+  }
+
+  .notice {
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 0.5rem;
   }
 
   input {
