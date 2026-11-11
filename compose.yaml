@@ -1,0 +1,20 @@
+# Builds the site and serves it at http://localhost:4321/skills-radar/
+# Optional: export GITHUB_TOKEN before running to avoid search rate limits.
+services:
+  web:
+    image: node:24-alpine
+    working_dir: /app
+    command: sh -c "npm ci && npm run build && npm run preview -- --host 0.0.0.0 --port 4321"
+    ports:
+      - "4321:4321"
+    environment:
+      - GITHUB_TOKEN
+    volumes:
+      - .:/app
+      # Keep container-generated files out of the host checkout
+      - node_modules:/app/node_modules
+      - /app/dist
+      - /app/.astro
+
+volumes:
+  node_modules:
