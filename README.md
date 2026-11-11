@@ -1,6 +1,6 @@
 # Skills Radar
 
-List and filter the most popular agent skills on GitHub, built with [Astro](https://astro.build).
+List and filter the most popular agent skills on GitHub.
 
 ## Quick start
 
