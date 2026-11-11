@@ -2,6 +2,8 @@
 
 List and filter the most popular agent skills on GitHub.
 
+**Live:** https://ludov41.github.io/skills-radar/
+
 ## Quick start
 
 `docker compose up` and open http://localhost:4321/.
@@ -10,7 +12,7 @@ List and filter the most popular agent skills on GitHub.
 
 At build time, the site queries the GitHub search API for repositories tagged with common skill topics (`agent-skills`, `claude-skills`, `claude-code-skills`, `claude-skill`), removes duplicates, forks and archived repos, and lists the top 100 by stars.
 
-The page is fully static: rebuild it to refresh the star counts.
+The page is fully static: rebuild it to refresh the star counts. The live site is deployed to GitHub Pages on every push and rebuilt every Monday.
 
 ## Development
 

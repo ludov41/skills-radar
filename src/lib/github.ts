@@ -147,6 +147,11 @@ export async function getSkills(): Promise<SkillsResult> {
   }
 
   // Walk by stars and only check the ambiguous repos that would make the list.
+  // When deploying, never publish an empty page over the live site.
+  if (candidates.size === 0 && import.meta.env.GITHUB_PAGES === 'true') {
+    throw new Error('Could not fetch any skills from GitHub');
+  }
+
   const selected: Repo[] = [];
   const sorted = [...candidates.values()].sort((a, b) => b.stargazers_count - a.stargazers_count);
   for (const repo of sorted) {
