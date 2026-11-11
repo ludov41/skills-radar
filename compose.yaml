@@ -1,4 +1,4 @@
-# Builds the site and serves it at http://localhost:4321/skills-radar/
+# Builds the site and serves it at http://localhost:4321/
 # Optional: export GITHUB_TOKEN before running to avoid search rate limits.
 services:
   web:

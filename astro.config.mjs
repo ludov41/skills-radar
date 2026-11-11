@@ -2,7 +2,4 @@
 import { defineConfig } from 'astro/config';
 
 // https://astro.build/config
-export default defineConfig({
-  site: 'https://ludov41.github.io',
-  base: '/skills-radar',
-});
+export default defineConfig({});
