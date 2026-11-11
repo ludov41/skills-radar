@@ -7,7 +7,23 @@ export interface Skill {
   stars: number;
   pushedAt: string;
   topics: string[];
+  // How the repo was found
+  sources: Source[];
+  // Keys of TOOLS the repo mentions
+  tools: Tool[];
 }
+
+export type Source = 'topic' | 'name';
+
+export const TOOLS = { claude: 'Claude Code', codex: 'Codex', cursor: 'Cursor', gemini: 'Gemini' } as const;
+export type Tool = keyof typeof TOOLS;
+
+const TOOL_KEYWORDS: Record<Tool, RegExp> = {
+  claude: /\b(claude|anthropics?)\b/i,
+  codex: /\b(codex|openai)\b/i,
+  cursor: /\bcursor\b/i,
+  gemini: /\bgemini\b/i,
+};
 
 interface Repo {
   full_name: string;
@@ -106,9 +122,14 @@ function looksLikeSkills(repo: Repo): boolean {
   return KEYWORDS.test(`${repo.description ?? ''} ${(repo.topics ?? []).join(' ')}`);
 }
 
+function detectTools(repo: Repo): Tool[] {
+  const text = `${repo.full_name} ${repo.description ?? ''} ${(repo.topics ?? []).join(' ')}`;
+  return (Object.keys(TOOL_KEYWORDS) as Tool[]).filter((tool) => TOOL_KEYWORDS[tool].test(text));
+}
+
 export async function getSkills(): Promise<SkillsResult> {
   const candidates = new Map<string, Repo>();
-  const trusted = new Set<string>();
+  const sources = new Map<string, Set<Source>>();
   const failedSearches: string[] = [];
 
   // Sequential on purpose: parallel search requests trip GitHub's secondary rate limit.
@@ -116,7 +137,8 @@ export async function getSkills(): Promise<SkillsResult> {
     try {
       for (const repo of await search(query)) {
         candidates.set(repo.full_name, repo);
-        if (query !== NAME_SEARCH) trusted.add(repo.full_name);
+        if (!sources.has(repo.full_name)) sources.set(repo.full_name, new Set());
+        sources.get(repo.full_name)!.add(query === NAME_SEARCH ? 'name' : 'topic');
       }
     } catch (error) {
       failedSearches.push(query);
@@ -129,7 +151,8 @@ export async function getSkills(): Promise<SkillsResult> {
   const sorted = [...candidates.values()].sort((a, b) => b.stargazers_count - a.stargazers_count);
   for (const repo of sorted) {
     if (selected.length === LIMIT) break;
-    if (trusted.has(repo.full_name) || looksLikeSkills(repo) || (await hasSkillFile(repo))) {
+    const trusted = sources.get(repo.full_name)!.has('topic');
+    if (trusted || looksLikeSkills(repo) || (await hasSkillFile(repo))) {
       selected.push(repo);
     }
   }
@@ -143,6 +166,8 @@ export async function getSkills(): Promise<SkillsResult> {
     stars: repo.stargazers_count,
     pushedAt: repo.pushed_at,
     topics: repo.topics ?? [],
+    sources: [...sources.get(repo.full_name)!],
+    tools: detectTools(repo),
   }));
 
   return { skills, failedSearches };
