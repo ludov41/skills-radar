@@ -25,6 +25,28 @@ const date = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
     }
     <div class="controls">
       <input id="filter" type="search" placeholder="Filter by name, owner or topic" aria-label="Filter skills" />
+      <button
+        id="sort-button"
+        type="button"
+        data-sort="stars"
+        title="Sorted by stars. Click to sort by recent activity."
+        aria-label="Sorted by stars. Click to sort by recent activity."
+      >
+        <svg
+          viewBox="0 0 24 24"
+          width="18"
+          height="18"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M7 4v16M3 16l4 4 4-4M14 6h7M14 12h5M14 18h3"></path>
+        </svg>
+        <span id="sort-label">Stars</span>
+      </button>
       <button id="filters-button" type="button" popovertarget="filters" aria-label="Filters" title="Filters">
         <svg
           viewBox="0 0 24 24"
@@ -72,11 +94,10 @@ const date = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
     </form>
   </header>
 
-  <ol id="list">
+  <ul id="list">
     {
-      skills.map((skill, i) => (
+      skills.map((skill) => (
         <li
-          value={i + 1}
           data-search={`${skill.fullName} ${skill.description} ${skill.topics.join(' ')}`.toLowerCase()}
           data-sources={skill.sources.join(' ')}
           data-tools={skill.tools.join(' ')}
@@ -96,7 +117,7 @@ const date = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
         </li>
       ))
     }
-  </ol>
+  </ul>
   <p id="empty" hidden>No skills match your filters.</p>
 </Base>
 
@@ -104,11 +125,32 @@ const date = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
   const DAY = 24 * 60 * 60 * 1000;
   const ALL_SOURCES = ['topic', 'name'];
 
+  const SORTS = {
+    stars: { label: 'Stars', title: 'Sorted by stars. Click to sort by recent activity.' },
+    updated: { label: 'Updated', title: 'Sorted by recent activity. Click to sort by stars.' },
+  };
+  type Sort = keyof typeof SORTS;
+
   const input = document.querySelector<HTMLInputElement>('#filter')!;
+  const sortButton = document.querySelector<HTMLButtonElement>('#sort-button')!;
+  const sortLabel = document.querySelector<HTMLElement>('#sort-label')!;
   const form = document.querySelector<HTMLFormElement>('#filters')!;
   const count = document.querySelector<HTMLElement>('#filters-count')!;
-  const items = document.querySelectorAll<HTMLLIElement>('#list li');
+  const list = document.querySelector<HTMLElement>('#list')!;
+  // Built in stars order
+  const items = [...list.querySelectorAll<HTMLLIElement>('li')];
+  const byUpdate = [...items].sort((a, b) => Number(b.dataset.pushed) - Number(a.dataset.pushed));
   const empty = document.querySelector<HTMLElement>('#empty')!;
+  let sort: Sort = 'stars';
+
+  function setSort(value: Sort) {
+    sort = value;
+    list.append(...(sort === 'stars' ? items : byUpdate));
+    sortButton.dataset.sort = sort;
+    sortLabel.textContent = SORTS[sort].label;
+    sortButton.title = SORTS[sort].title;
+    sortButton.setAttribute('aria-label', SORTS[sort].title);
+  }
 
   const checked = (name: string) =>
     [...form.querySelectorAll<HTMLInputElement>(`input[name="${name}"]:checked`)].map((box) => box.value);
@@ -125,6 +167,7 @@ const date = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
     }
     select.value = params.get('updated') ?? '';
     if (select.selectedIndex === -1) select.value = '';
+    setSort(params.get('sort') === 'updated' ? 'updated' : 'stars');
   }
 
   function apply() {
@@ -159,11 +202,16 @@ const date = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
     if (sources.length < ALL_SOURCES.length) params.set('source', sources.join(','));
     if (tools.length) params.set('tool', tools.join(','));
     if (days) params.set('updated', String(days));
+    if (sort !== 'stars') params.set('sort', sort);
     const search = params.toString().replaceAll('%2C', ',');
     history.replaceState(null, '', search ? `?${search}` : location.pathname);
   }
 
   input.addEventListener('input', apply);
+  sortButton.addEventListener('click', () => {
+    setSort(sort === 'stars' ? 'updated' : 'stars');
+    apply();
+  });
   form.addEventListener('change', apply);
   // Reset restores the default form values, then the change must be applied.
   form.addEventListener('reset', () => setTimeout(apply));
@@ -200,6 +248,7 @@ const date = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
   }
 
   #filter,
+  #sort-button,
   #filters-button,
   select {
     border: 1px solid var(--border);
@@ -224,6 +273,23 @@ const date = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
     anchor-name: --filters;
   }
 
+  #sort-button {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0 0.75rem;
+    cursor: pointer;
+  }
+
+  #sort-button span {
+    /* Same width for both labels so the layout doesn't jump */
+    min-width: 4.2em;
+    text-align: left;
+    font-size: 0.875rem;
+  }
+
+  #sort-button:hover,
+  #sort-button:focus-visible,
   #filters-button:hover,
   #filters-button:focus-visible {
     border-color: var(--accent);
@@ -313,17 +379,14 @@ const date = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
     cursor: pointer;
   }
 
-  ol {
-    padding-left: 2rem;
+  ul {
+    padding: 0;
+    list-style: none;
   }
 
   li {
     padding-block: 0.9rem;
     border-bottom: 1px solid var(--border);
-  }
-
-  li::marker {
-    color: var(--muted);
   }
 
   .row {
