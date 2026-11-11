@@ -409,4 +409,22 @@ const date = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
   li p {
     margin: 0.25rem 0;
   }
+
+  /* On mobile: search on its own row, the two buttons share the row below */
+  @media (max-width: 30rem) {
+    .controls {
+      flex-wrap: wrap;
+    }
+
+    #filter {
+      flex-basis: 100%;
+    }
+
+    #sort-button,
+    #filters-button {
+      flex: 1;
+      justify-content: center;
+      height: 2.5rem;
+    }
+  }
 </style>
